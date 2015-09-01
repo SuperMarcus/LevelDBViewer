@@ -1,5 +1,6 @@
 package com.supermarcus.leveldbviewer.ui;
 
+import com.supermarcus.leveldbviewer.LevelDBViewer;
 import org.iq80.leveldb.Options;
 
 import javax.swing.*;
@@ -39,6 +40,7 @@ public class Viewer {
     private JButton saveButton;
     private JLabel notice;
     private JComboBox<PutType> putType;
+    private JCheckBox signedBox;
 
     private boolean isSet = false;
 
@@ -58,6 +60,7 @@ public class Viewer {
         saveButton.setEnabled(false);
         putType.setEnabled(false);
         putType.setEditable(false);
+        signedBox.setEnabled(false);
 
         openButton.addActionListener(new ActionListener() {
             @Override
@@ -237,15 +240,28 @@ public class Viewer {
             public void valueChanged(ListSelectionEvent e) {
                 DBItem item = dataList.getSelectedValue();
                 if (item != null) {
-                    hexValue.setText(cutToLine(new BigInteger(item.value).toString(16), 64));
+                    hexValue.setText(cutToLine(LevelDBViewer.toHexString(item.value), 64));
                     stringValue.setText(cutToLine(new String(item.value), 64));
-                    hexKey.setText(cutToLine(new BigInteger(item.key).toString(16), 64));
+                    hexKey.setText(cutToLine(LevelDBViewer.toHexString(item.key), 64));
                     stringKey.setText(cutToLine(new String(item.key), 64));
 
                     lengthLabel.setText(String.valueOf(item.value.length + item.key.length));
                     keyLength.setText(String.valueOf(item.key.length));
                     valueLength.setText(String.valueOf(item.value.length));
                 }
+            }
+        });
+
+        signedBox.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                LevelDBViewer.DEFAULT_SINGED = signedBox.isSelected();
+                int i = dataList.getSelectedIndex();
+                dataList.clearSelection();
+                dataList.updateUI();
+                dataList.setSelectedIndex(i);
+                update(hexKey);
+                update(hexValue);
             }
         });
 
@@ -292,14 +308,14 @@ public class Viewer {
                         return;
                     }
                     item.key = area.getText().replaceAll("\n", "").replaceAll("%\\{EOL}", "\n").getBytes();
-                    hexKey.setText(cutToLine(new BigInteger(item.key).toString(16), 64));
+                    hexKey.setText(cutToLine(LevelDBViewer.toHexString(item.key), 64));
                     dataList.updateUI();
                 }else if(area == hexValue){
                     item.value = new BigInteger(area.getText().replaceAll("\n", "").replaceAll("%\\{EOL}", "\n"), 16).toByteArray();
                     stringValue.setText(cutToLine(new String(item.value), 64));
                 }else if(area == stringValue){
                     item.value = area.getText().replaceAll("\n", "").replaceAll("%\\{EOL}", "\n").getBytes();
-                    hexValue.setText(cutToLine(new BigInteger(item.value).toString(16), 64));
+                    hexValue.setText(cutToLine(LevelDBViewer.toHexString(item.value), 64));
                 }
                 notice.setVisible(false);
                 notice.setText("");
@@ -381,8 +397,16 @@ public class Viewer {
                 String reg = findField.getText().trim();
 
                 for(iterator.seekToFirst(); iterator.hasNext(); iterator.next()) {
-                    if(reg.isEmpty() || new BigInteger(iterator.peekNext().getKey()).toString(16).contains(reg) || new BigInteger(iterator.peekNext().getValue()).toString(16).contains(reg) || new String(iterator.peekNext().getKey()).contains(reg) || new String(iterator.peekNext().getValue()).contains(reg))
+                    if(reg.isEmpty()                                                                  ||
+                            new BigInteger(iterator.peekNext().getKey()).toString(16).contains(reg)   ||
+                            LevelDBViewer.toHexString(iterator.peekNext().getKey()).contains(reg)     ||
+                            new BigInteger(iterator.peekNext().getValue()).toString(16).contains(reg) ||
+                            LevelDBViewer.toHexString(iterator.peekNext().getValue()).contains(reg)   ||
+                            new String(iterator.peekNext().getKey()).contains(reg)                    ||
+                            new String(iterator.peekNext().getValue()).contains(reg))
+                    {
                         data.add(new DBItem(iterator.peekNext().getKey(), iterator.peekNext().getValue()));
+                    }
                 }
 
                 iterator.close();
@@ -398,6 +422,7 @@ public class Viewer {
                 findField.setEnabled(true);
                 deleteButton.setEnabled(true);
                 putType.setEnabled(true);
+                signedBox.setEnabled(true);
                 //saveButton.setEnabled(true);
 
                 hexValue.setText("");
@@ -525,7 +550,7 @@ public class Viewer {
                 case STRING:
                     return asString(bytes);
                 case HEX:
-                    return new BigInteger(bytes).toString(16);
+                    return LevelDBViewer.toHexString(bytes);
             }
             return "";
         }
